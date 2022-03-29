@@ -10,6 +10,7 @@ import openpyxl
 import pandas as pd
 import requests
 from sqlalchemy import create_engine, exc, inspect
+from numpy import nan
 
 
 def downloadArchive(URL):
@@ -103,19 +104,19 @@ logging.info('Current working directory: ' + current_directory)
 
 result_directory = ( current_directory + '\\' if DOWNLOAD_FOLDER_TYPE == 'relative' else '' ) + DOWNLOAD_FOLDER
 
-if SHOULD_CLEAR == 'yes':
-    if os.path.exists(result_directory):
-        for file in os.listdir(result_directory):
-            os.remove(result_directory + '\\' + file)
-            logging.info('File has been removed: ' + file)
+# if SHOULD_CLEAR == 'yes':
+#     if os.path.exists(result_directory):
+#         for file in os.listdir(result_directory):
+#             os.remove(result_directory + '\\' + file)
+#             logging.info('File has been removed: ' + file)
 
-        os.rmdir(result_directory)
-        logging.info('Downloads folder has been removed')
-    else:
-        logging.info('Downloads folder doesn\'t exist')
+#         os.rmdir(result_directory)
+#         logging.info('Downloads folder has been removed')
+#     else:
+#         logging.info('Downloads folder doesn\'t exist')
 
-for url in URLs:
-    downloadArchive(url)
+# for url in URLs:
+#     downloadArchive(url)
 
 try:
     DB_USER = input('Enter database username: ')
@@ -127,7 +128,7 @@ try:
         logging.info('MySQL engine has been successfully created')
 
         if TABLES_BEHAVIOUR == 'replace':
-            # Getting all shema tables names
+            # Getting all schema tables names
             inspector = inspect(db_engine)
             table_names = inspector.get_table_names()
 
@@ -173,7 +174,9 @@ try:
                             header = [0]
                             df = pd.read_csv(result_directory + '\\' + file, 
                                             header=header)
-                  
+
+                        df.fillna(value=nan)
+
                         # 'append' creates table if it doesn't exist
                         df.to_sql(con=db_engine, 
                                   schema=DB, 
