@@ -11,6 +11,7 @@ import pandas as pd
 import requests
 from sqlalchemy import create_engine, exc, inspect
 from numpy import nan
+from plyer import notification
 
 
 def downloadArchive(URL):
@@ -119,6 +120,14 @@ result_directory = ( current_directory + '\\' if DOWNLOAD_FOLDER_TYPE == 'relati
 #     downloadArchive(url)
 
 try:
+    notification.notify(
+        title = 'Credentials',
+        message = 'Enter your credentials',
+        app_icon = None,
+        timeout = 10
+    )
+
+
     DB_USER = input('Enter database username: ')
     DB_PASSWORD = getpass.getpass('Enter database password: ')
 
@@ -144,6 +153,13 @@ try:
         # Iterrating over all files in Downloads folder
         for file in os.listdir(result_directory):
             logging.info('Started loading data from file ' + result_directory + '\\' + file)
+
+            notification.notify(
+                title = 'Loading data to DB',
+                message = f'Started loading {file}',
+                app_icon = None,
+                timeout = 10
+            )
 
             # Gettings current file extension
             file_extension = os.path.splitext(file)[-1]
@@ -192,8 +208,21 @@ try:
 
 except exc.SQLAlchemyError as e:
     logging.error(e)
+    notification.notify(
+        title = 'Error occurred',
+        message = f'Check current log file: {log_file_name}',
+        app_icon = None,
+        timeout = 10
+    )
 except Exception as e:
     logging.error(traceback.format_exc())
+    notification.notify(
+        title = 'Error occurred',
+        message = f'Check current log file: {log_file_name}',
+        app_icon = None,
+        timeout = 10
+    )
 finally:
-    db_engine.dispose()
-    logging.info(f'MySQL engine has been disposed')
+    if 'db_engine' in globals():
+        db_engine.dispose()
+        logging.info(f'MySQL engine has been disposed')
