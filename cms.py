@@ -3,6 +3,7 @@ import datetime
 import logging
 import os
 import traceback
+from unicodedata import numeric
 import zipfile
 from io import BytesIO
 
@@ -75,13 +76,15 @@ DOWNLOAD_FOLDER = getParameterValue(parameters, 'Download folder')
 DOWNLOAD_FOLDER_TYPE = getParameterValue(parameters, 'Download folder path type')
 SHOULD_CLEAR = getParameterValue(parameters, 'Clear download folder')
 TABLES_BEHAVIOUR = getParameterValue(parameters, 'If tables exist')
+DEFAULT_NUMERIC_FORMAT = getParameterValue(parameters, 'Default number format')
+DEFAULT_DATE_FORMAT = getParameterValue(parameters, 'Default date format')
 
 URLs = getDataFromTable(wb, 'Parameters', 'URLs')['URL']
 mappings = getDataFromTable(wb, 'Parameters', 'Mappings')
 mappings_tables = list(mappings['DB table'])
 mappings_parts = list(mappings['Part of file name'])
 mappings_defHeaders = list(mappings['Default headers'])
-mappings_headers = list(mappings['DB columns'])
+mappings_headers_settings = list(mappings['DB columns'])
 
 wb.close()
 
@@ -105,19 +108,19 @@ logging.info('Current working directory: ' + current_directory)
 
 result_directory = ( current_directory + '\\' if DOWNLOAD_FOLDER_TYPE == 'relative' else '' ) + DOWNLOAD_FOLDER
 
-# if SHOULD_CLEAR == 'yes':
-#     if os.path.exists(result_directory):
-#         for file in os.listdir(result_directory):
-#             os.remove(result_directory + '\\' + file)
-#             logging.info('File has been removed: ' + file)
+if SHOULD_CLEAR == 'yes':
+    if os.path.exists(result_directory):
+        for file in os.listdir(result_directory):
+            os.remove(result_directory + '\\' + file)
+            logging.info('File has been removed: ' + file)
 
-#         os.rmdir(result_directory)
-#         logging.info('Downloads folder has been removed')
-#     else:
-#         logging.info('Downloads folder doesn\'t exist')
+        os.rmdir(result_directory)
+        logging.info('Downloads folder has been removed')
+    else:
+        logging.info('Downloads folder doesn\'t exist')
 
-# for url in URLs:
-#     downloadArchive(url)
+for url in URLs:
+    downloadArchive(url)
 
 try:
     notification.notify(
@@ -128,8 +131,8 @@ try:
     )
 
 
-    DB_USER = input('Enter database username: ')
-    DB_PASSWORD = getpass.getpass('Enter database password: ')
+    DB_USER = 'admin' #input('Enter database username: ')
+    DB_PASSWORD = 'admin' #getpass.getpass('Enter database password: ')
 
     db_engine = create_engine(f'mysql://{DB_USER}:{DB_PASSWORD}@{HOST}/{DB}')
 
@@ -174,18 +177,27 @@ try:
                     if path_part.lower() in file.lower():
 
                         defHeaders = mappings_defHeaders[index]
-                        headerManual = mappings_headers[index]
+                        headerSettings = mappings_headers_settings[index]
                         table_name = mappings_tables[index]
 
                         # If there are no headers in the file and no headers in the Parameters file, then skip this file
                         if defHeaders == 'no':
-                            if headerManual == None:
+                            if headerSettings == None:
                                 logging.critical(f'No specified headers for file {file}')
                                 break
                             else:
-                                header = headerManual.split(';')
+                                headerSettings = mappings_headers_settings[index].split(';')
+                                headerSettings = list(map(lambda x: x.split(':'), headerSettings))
+                                header_names = list(map(lambda x: x[0], headerSettings))
                                 df = pd.read_csv(result_directory + '\\' + file, 
-                                                names=header)
+                                                names=header_names)
+                                for colSettings in headerSettings:
+                                    if len(colSettings) > 1:
+                                        colName = colSettings[0]
+                                        if colSettings[1] == 'numeric':
+                                            df[colName] = pd.to_numeric(df[colName], downcast=DEFAULT_NUMERIC_FORMAT)
+                                        elif colSettings[1] == 'datetime':
+                                            df[colName] = pd.to_datetime(df[colName], format=DEFAULT_DATE_FORMAT)
                         else:
                             header = [0]
                             df = pd.read_csv(result_directory + '\\' + file, 
