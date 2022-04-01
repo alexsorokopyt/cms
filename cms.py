@@ -3,7 +3,7 @@ import datetime
 import logging
 import os
 import traceback
-from unicodedata import numeric
+
 import zipfile
 from io import BytesIO
 
@@ -108,19 +108,19 @@ logging.info('Current working directory: ' + current_directory)
 
 result_directory = ( current_directory + '\\' if DOWNLOAD_FOLDER_TYPE == 'relative' else '' ) + DOWNLOAD_FOLDER
 
-if SHOULD_CLEAR == 'yes':
-    if os.path.exists(result_directory):
-        for file in os.listdir(result_directory):
-            os.remove(result_directory + '\\' + file)
-            logging.info('File has been removed: ' + file)
+# if SHOULD_CLEAR == 'yes':
+#     if os.path.exists(result_directory):
+#         for file in os.listdir(result_directory):
+#             os.remove(result_directory + '\\' + file)
+#             logging.info('File has been removed: ' + file)
 
-        os.rmdir(result_directory)
-        logging.info('Downloads folder has been removed')
-    else:
-        logging.info('Downloads folder doesn\'t exist')
+#         os.rmdir(result_directory)
+#         logging.info('Downloads folder has been removed')
+#     else:
+#         logging.info('Downloads folder doesn\'t exist')
 
-for url in URLs:
-    downloadArchive(url)
+# for url in URLs:
+#     downloadArchive(url)
 
 try:
     notification.notify(
@@ -190,7 +190,7 @@ try:
                                 headerSettings = list(map(lambda x: x.split(':'), headerSettings))
                                 header_names = list(map(lambda x: x[0], headerSettings))
                                 df = pd.read_csv(result_directory + '\\' + file, 
-                                                names=header_names)
+                                                names=header_names, dtype=str)
                                 for colSettings in headerSettings:
                                     if len(colSettings) > 1:
                                         colName = colSettings[0]
@@ -210,8 +210,8 @@ try:
                                   schema=DB, 
                                   name=table_name, 
                                   if_exists='append', 
-                                  index=False,
-                                  chunksize=1000)
+                                  index=False
+                        )
 
                         logging.critical(f'{len(df.index)} new rows were successfully loaded to table {table_name} from {file}')
                         break

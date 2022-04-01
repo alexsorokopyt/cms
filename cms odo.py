@@ -10,20 +10,29 @@ from io import BytesIO
 
 import odo
 from odo import discover
+from odo import resource
 
+# Python 3.7.9
 
-# There are problem with pandas.py file inside odo package. 
-# So in Ubuntu you need to go to Computer/usr/local/lib/python3.8/dist-packages/odo/backends/ and open pandas.py. 
+# python -m venv venv
+# venv\Scripts\activate
+# pip install odo
+# pip install 'sqlalchemy=1.3'
+
+# Fix problem with pandas.py file inside odo package: 
+# Go to venv/Lib/odo/backends/ and open pandas.py. 
 # Than in line 94, change
-# pd.tslib.NaTType
+# pd.tslib.NaTType 
 # to
 # type(pd.NaT)
 
-# pip install 'sqlalchemy=1.3'
+# Now disable 'secure-file-priv' in MySQL 
+# Go to C:\ProgramData\MySQL\MySQL Server 8.0\my.ini and open my.ini
+# Find the line secure-file-priv, set secure-file-priv=""
+# Then start\restart MySQL Server: Windows + R >> services.msc >> MySQL >> Start\Restart
 
-# disable 'secure-file-priv' in MySQL 
-# C:\ProgramData\MySQL\MySQL Server 8.0\my.ini
-# then Windows + R >> services.msc >> MySQL >> Start\Restart
+# Add UserGroup NETWORK SERVICE to Downloads security settings
+# https://stackoverflow.com/questions/61536742/mysqldump-with-windows10-os-errno-13-permission-denied-when-executing-sel
 
 import openpyxl
 import pandas as pd
@@ -151,14 +160,105 @@ try:
     DB_USER = 'admin' #input('Enter database username: ')
     DB_PASSWORD = 'admin' #getpass.getpass('Enter database password: ')
 
-    db_engine = create_engine(f'mysql://{DB_USER}:{DB_PASSWORD}@{HOST}/{DB}')
-
     for file in os.listdir(DOWNLOAD_FOLDER):
-        ds = odo.dshape("var * {RPT_REC_NUM: int64, WKSHT_CD: string, LINE_NUM: string, CLMN_NUM: string, ALPHNMRC_ITM_TXT: string}")
-        csv_uri = f'{DOWNLOAD_FOLDER}/{os.path.splitext(file)[0] + os.path.splitext(file)[1].lower()}'
-        mysql_uri = f'mysql://{DB_USER}:{DB_PASSWORD}@{HOST}/{DB}::rpt_alpha'
-        odo.odo(csv_uri, mysql_uri, dshape=ds, escapechar='')
-        print(file)
+
+        file_path_split = os.path.splitext(file)
+        file_name = file_path_split[0]
+        file_extension = file_path_split[1].lower()
+
+        if '_RPT' in file_name:
+
+            logging.info(f'Started loading data from file {result_directory}\\{file}')
+#  ?map[int64, T]
+            db_table = 'rpt'
+            datatypes = 'var * {RPT_REC_NUM: intptr, PRVDR_CTRL_TYPE_CD: string, PRVDR_NUM: string, NPI: option[intptr], RPT_STUS_CD: string, FY_BGN_DT: date, FY_END_DT: date, PROC_DT: datetime, INITL_RPT_SW: string, LAST_RPT_SW: string, TRNSMTL_NUM: string, FI_NUM: string, ADR_VNDR_CD: string, FI_CREAT_DT: datetime, UTIL_CD: string, NPR_DT: datetime, SPEC_IND: string, FI_RCPT_DT: datetime}'
+
+            csv_uri = f'{DOWNLOAD_FOLDER}/{file_name + file_extension}'
+            from datetime import datetime
+            custom_date_parser = lambda x: datetime.strptime(x, '%d/%m%Y')
+
+            dataset = pd.read_csv(
+                csv_uri,
+                header=None,
+                names=[
+                    'RPT_REC_NUM',
+                    'PRVDR_CTRL_TYPE_CD',
+                    'PRVDR_NUM',
+                    'NPI',
+                    'RPT_STUS_CD',
+                    'FY_BGN_DT',
+                    'FY_END_DT',
+                    'PROC_DT', 
+                    'INITL_RPT_SW', 
+                    'LAST_RPT_SW', 
+                    'TRNSMTL_NUM',
+                    'FI_NUM', 
+                    'ADR_VNDR_CD',
+                    'FI_CREAT_DT',
+                    'UTIL_CD',
+                    'NPR_DT',
+                    'SPEC_IND',
+                    'FI_RCPT_DT'
+                ],
+                # dtype={
+                #     'RPT_REC_NUM': int,
+                #     'PRVDR_CTRL_TYPE_CD': str,
+                #     'PRVDR_NUM': str,
+                #     'NPI': int,
+                #     'RPT_STUS_CD': str,
+                #     # 'FY_BGN_DT': datetime,
+                #     # 'FY_END_DT': datetime,
+                #     # 'PROC_DT': datetime, 
+                #     'INITL_RPT_SW': str, 
+                #     'LAST_RPT_SW': str, 
+                #     'TRNSMTL_NUM': str,
+                #     'FI_NUM': str, 
+                #     'ADR_VNDR_CD': str,
+                #     # 'FI_CREAT_DT': datetime,
+                #     'UTIL_CD': str,
+                #     # 'NPR_DT': datetime,
+                #     'SPEC_IND': str
+                #     # 'FI_RCPT_DT': datetime
+                # },
+
+                parse_dates=['FY_BGN_DT', 'FY_END_DT', 'PROC_DT', 'FI_CREAT_DT', 'NPR_DT', 'FI_RCPT_DT'],
+                # date_parser=custom_date_parser
+                dayfirst=True
+            )
+
+            dataset = dataset.fillna(value=nan)
+            dataset = dataset.astype(
+                {
+                    'RPT_REC_NUM': float,
+                    'PRVDR_CTRL_TYPE_CD': str,
+                    'PRVDR_NUM': str,
+                    'NPI': float,
+                    'RPT_STUS_CD': str,
+                    'INITL_RPT_SW': str, 
+                    'LAST_RPT_SW': str, 
+                    'TRNSMTL_NUM': str,
+                    'FI_NUM': str, 
+                    'ADR_VNDR_CD': str,
+                    'UTIL_CD': str,
+                    'SPEC_IND': str
+                }
+            )
+
+            print(dataset.head())
+
+            mysql_uri = f'mysql://{DB_USER}:{DB_PASSWORD}@{HOST}/{DB}::{db_table}'
+
+            odo.odo(
+                # csv_uri,
+                dataset, 
+                mysql_uri
+                # dshape=datatypes, 
+                # escapechar=''
+                # has_header=False,
+                # na_values='NULL'
+            )
+
+            logging.critical(f'File {file} has been successfully loaded to table {db_table}')
 
 
     # with db_engine.connect() as connection:
@@ -243,14 +343,14 @@ try:
 
     #     connection.close()
 
-except exc.SQLAlchemyError as e:
-    logging.error(e)
-    notification.notify(
-        title = 'Error occurred',
-        message = f'Check current log file: {log_file_name}',
-        app_icon = None,
-        timeout = 10
-    )
+# except exc.SQLAlchemyError as e:
+#     logging.error(e)
+#     notification.notify(
+#         title = 'Error occurred',
+#         message = f'Check current log file: {log_file_name}',
+#         app_icon = None,
+#         timeout = 10
+#     )
 except Exception as e:
     logging.error(traceback.format_exc())
     notification.notify(
