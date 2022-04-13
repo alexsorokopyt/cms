@@ -62,9 +62,6 @@ log_file_name = current_filename + datetime.datetime.now().strftime(" %m.%d.%Y %
 logging.basicConfig(filename = log_file_name, level = logging.INFO, format = '%(asctime)s:%(levelname)s:%(message)s')
 
 PARAMETERS_PATH = 'C:\\Users\\user\\Documents\\cms\\Parameters.xlsx'
-ALPHA_TABLE = 'rpt_alpha'
-RPT_TABLE = 'rpt'
-NMRC_TABLE = 'rpt_nmrc'
 
 wb = openpyxl.load_workbook(PARAMETERS_PATH)
 
@@ -108,19 +105,19 @@ logging.info('Current working directory: ' + current_directory)
 
 result_directory = ( current_directory + '\\' if DOWNLOAD_FOLDER_TYPE == 'relative' else '' ) + DOWNLOAD_FOLDER
 
-# if SHOULD_CLEAR == 'yes':
-#     if os.path.exists(result_directory):
-#         for file in os.listdir(result_directory):
-#             os.remove(result_directory + '\\' + file)
-#             logging.info('File has been removed: ' + file)
+if SHOULD_CLEAR == 'yes':
+    if os.path.exists(result_directory):
+        for file in os.listdir(result_directory):
+            os.remove(result_directory + '\\' + file)
+            logging.info('File has been removed: ' + file)
 
-#         os.rmdir(result_directory)
-#         logging.info('Downloads folder has been removed')
-#     else:
-#         logging.info('Downloads folder doesn\'t exist')
+        os.rmdir(result_directory)
+        logging.info('Downloads folder has been removed')
+    else:
+        logging.info('Downloads folder doesn\'t exist')
 
-# for url in URLs:
-#     downloadArchive(url)
+for url in URLs:
+    downloadArchive(url)
 
 try:
     notification.notify(
@@ -191,6 +188,11 @@ try:
                                 header_names = list(map(lambda x: x[0], headerSettings))
                                 df = pd.read_csv(result_directory + '\\' + file, 
                                                 names=header_names, dtype=str)
+                                
+                                rep_year = int(file.split('_')[1])
+                                df['REP_YEAR'] = rep_year
+                                df['FILE'] = file
+
                                 for colSettings in headerSettings:
                                     if len(colSettings) > 1:
                                         colName = colSettings[0]
